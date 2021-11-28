@@ -1,0 +1,89 @@
+version: "3"
+
+networks:
+    docker-network:
+
+services:
+
+    site:
+        build:
+            context: ./dockerfiles
+            dockerfile: nginx.dockerfile
+            args:
+                - UID=${UID:-1000}
+                - GID=${GID:-1000}
+        container_name: nginx
+        ports:
+            - 8080:80
+        volumes:
+            - ./src:/var/www/html:delegated
+        depends_on:
+            - php
+            - mysql
+            - phpmyadmin
+        networks:
+            - docker-network
+
+    mysql:
+        image: mariadb:10.6
+        container_name: mysql
+        restart: unless-stopped
+        tty: true
+        ports:
+            - 4306:3306
+        environment:
+            MYSQL_DATABASE: dockerdb
+            MYSQL_USER: dockerdb
+            MYSQL_PASSWORD: dockerdb
+            MYSQL_ROOT_PASSWORD: dockerdb
+            SERVICE_TAGS: dev
+            SERVICE_NAME: mysql
+        volumes:
+            - ./mysql:/var/lib/mysql
+        networks:
+            - docker-network
+
+    php:
+        build:
+            context: ./dockerfiles
+            dockerfile: php.dockerfile
+            args:
+                - UID=${UID:-1000}
+                - GID=${GID:-1000}
+        container_name: php
+        volumes:
+            - ./src:/var/www/html:delegated
+        networks:
+            - docker-network
+
+    composer:
+        build:
+            context: ./dockerfiles
+            dockerfile: composer.dockerfile
+            args:
+                - UID=${UID:-1000}
+                - GID=${GID:-1000}
+        container_name: composer
+        volumes:
+            - ./src:/var/www/html
+        working_dir: /var/www/html
+        depends_on:
+            - php
+        user: laravel
+        entrypoint: ["composer", "--ignore-platform-reqs"]
+        networks:
+            - docker-network
+
+    phpmyadmin:
+        image: phpmyadmin/phpmyadmin
+        restart: always
+        container_name: phpmyaadmin
+        depends_on: 
+            - mysql
+        ports:
+            - 9000:80
+        environment: 
+            PMA_HOST: mysql
+            MYSQL_ROOT_PASSWORD: dockerdb
+        networks:
+            - docker-network
